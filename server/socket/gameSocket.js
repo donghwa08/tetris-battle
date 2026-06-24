@@ -6,7 +6,6 @@ module.exports = (io) => {
   io.on("connection", (socket) => {
     console.log("유저 접속:", socket.id);
 
-    // 빠른 대전
     socket.on("quickMatch", (data) => {
       quickQueue.push({ socket, user_id: data.user_id });
 
@@ -19,7 +18,10 @@ module.exports = (io) => {
           .substring(2, 8)
           .toUpperCase();
         rooms[roomCode] = {
-          players: [player1.socket.id, player2.socket.id],
+          players: [
+            { socketId: player1.socket.id, user_id: player1.user_id },
+            { socketId: player2.socket.id, user_id: player2.user_id },
+          ],
           status: "playing",
         };
         player1.socket.join(roomCode);
@@ -60,7 +62,7 @@ module.exports = (io) => {
     socket.on("createRoom", (data) => {
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       rooms[roomCode] = {
-        players: [socket.id],
+        players: [{ socketId: socket.id, user_id: data?.user_id }],
         hostId: data?.user_id,
         status: "waiting",
       };
@@ -81,17 +83,18 @@ module.exports = (io) => {
         return socket.emit("error", { message: "방이 꽉 찼습니다." });
       }
 
-      room.players.push(socket.id);
+      room.players.push({ socketId: socket.id, user_id: data.user_id });
       socket.join(roomCode);
       socket.emit("joinedRoom", {
         roomCode,
         roomId: roomCode,
-        opponent: rooms[roomCode].hostId,
+        opponent: room.hostId,
       });
-      io.to(room.players[0]).emit("opponentJoined", { user_id: data.user_id });
+      io.to(room.players[0].socketId).emit("opponentJoined", {
+        user_id: data.user_id,
+      });
     });
 
-    //방해블록 전송
     socket.on("sendGarbage", (data) => {
       const code = data.roomCode || data.roomId;
       socket.to(code).emit("receiveGarbage", {
@@ -106,36 +109,52 @@ module.exports = (io) => {
         duration: data.duration,
       });
     });
-    // 상대 보드 실시간 전송 ← 여기 추가
     socket.on("boardUpdate", (data) => {
       const code = data.roomCode || data.roomId;
       socket.to(code).emit("opponentBoard", data);
     });
 
     socket.on("playerReady", (data) => {
-      console.log("playerReady 받은 데이터:", data); // 뭐가 오는지 확인
+      console.log("playerReady 받은 데이터:", data);
       const code = data.roomCode || data.roomId;
       socket.to(code).emit("playerReady", { ready: data.ready });
     });
 
-    // 바로 아래 startGame
     socket.on("startGame", ({ roomCode, roomId }) => {
       const code = roomCode || roomId;
       io.to(code).emit("gameStart");
     });
-    //게임 오버
-    socket.on("gameOver", ({ roomCode, roomId }) => {
+
+    // 게임 오버 - 진 사람의 user_id를 받아서 승패 판정 후 양쪽에 결과 통보
+    // 결과 통보를 받은 클라이언트가 /api/battle-score 로 POST 호출해서 DB에 저장함
+    socket.on("gameOver", ({ roomCode, roomId, user_id }) => {
       const code = roomCode || roomId;
-      socket.to(code).emit("opponentOver");
-      if (rooms[code]) {
-        rooms[code].status = "finished";
+      const room = rooms[code];
+
+      if (room && room.status !== "finished") {
+        room.status = "finished";
+
+        const loser = room.players.find((p) => p.user_id === user_id);
+        const winner = room.players.find((p) => p.user_id !== user_id);
+
+        if (winner && loser) {
+          io.to(winner.socketId).emit("battleResult", {
+            result: "win",
+            opponent: loser.user_id,
+          });
+          io.to(loser.socketId).emit("battleResult", {
+            result: "lose",
+            opponent: winner.user_id,
+          });
+        }
       }
+
+      socket.to(code).emit("opponentOver");
     });
 
     socket.on("disconnect", () => {
       console.log("유저 나감:", socket.id);
 
-      // 다시하기 대기 정리
       for (const roomId in rematchReady) {
         if (rematchReady[roomId].includes(socket.id)) {
           socket.to(roomId).emit("rematchDeclined");
@@ -143,13 +162,12 @@ module.exports = (io) => {
         }
       }
 
-      // 대기열 정리
       const idx = quickQueue.findIndex((p) => p.socket.id === socket.id);
       if (idx !== -1) quickQueue.splice(idx, 1);
 
       for (const roomCode in rooms) {
         const room = rooms[roomCode];
-        if (room.players.includes(socket.id)) {
+        if (room.players.some((p) => p.socketId === socket.id)) {
           socket.to(roomCode).emit("opponentLeft");
           delete rooms[roomCode];
         }

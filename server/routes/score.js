@@ -123,38 +123,56 @@ router.get("/item-ranking", (req, res) => {
   });
 });
 
-// 대결모드 점수 저장
+// 대결모드 점수 저장 (user_id 문자열로 받아서 내부에서 숫자 id로 변환)
 router.post("/battle-score", (req, res) => {
-  const { player_id, wins, played } = req.body;
+  const { user_id, wins, played } = req.body;
+
+  if (!user_id) {
+    return res.status(400).json({ message: "user_id가 없습니다." });
+  }
 
   const sql = `
     INSERT INTO battle_scores (player_id, wins, played)
-    VALUES (?, ?, ?)
+    SELECT id, ?, ? FROM users WHERE user_id = ?
     ON DUPLICATE KEY UPDATE
     wins = wins + ?, played = played + ?
   `;
 
-  db.query(sql, [player_id, wins, played, wins, played], (err, result) => {
+  db.query(sql, [wins, played, user_id, wins, played], (err, result) => {
     if (err)
       return res.status(500).json({ message: "DB 저장 실패", error: err });
+    if (result.affectedRows === 0) {
+      return res
+        .status(404)
+        .json({ message: "해당 user_id를 찾을 수 없습니다." });
+    }
     res.json({ message: "대결 점수 저장 성공!" });
   });
 });
 
-// 아이템모드 점수 저장
+// 아이템모드 점수 저장 (user_id 문자열로 받아서 내부에서 숫자 id로 변환)
 router.post("/item-score", (req, res) => {
-  const { player_id, wins, played } = req.body;
+  const { user_id, wins, played } = req.body;
+
+  if (!user_id) {
+    return res.status(400).json({ message: "user_id가 없습니다." });
+  }
 
   const sql = `
     INSERT INTO item_scores (player_id, wins, played)
-    VALUES (?, ?, ?)
+    SELECT id, ?, ? FROM users WHERE user_id = ?
     ON DUPLICATE KEY UPDATE
     wins = wins + ?, played = played + ?
   `;
 
-  db.query(sql, [player_id, wins, played, wins, played], (err, result) => {
+  db.query(sql, [wins, played, user_id, wins, played], (err, result) => {
     if (err)
       return res.status(500).json({ message: "DB 저장 실패", error: err });
+    if (result.affectedRows === 0) {
+      return res
+        .status(404)
+        .json({ message: "해당 user_id를 찾을 수 없습니다." });
+    }
     res.json({ message: "아이템 점수 저장 성공!" });
   });
 });
