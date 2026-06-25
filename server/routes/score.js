@@ -14,8 +14,11 @@ const db = mysql.createPool({
 });
 
 router.post("/score", (req, res) => {
-  const { player_id, score, lines_cleared, level, play_time, game_type } = req.body;
-  const mode = ['single', 'battle', 'item_battle'].includes(game_type) ? game_type : 'single';
+  const { player_id, score, lines_cleared, level, play_time, game_type } =
+    req.body;
+  const mode = ["single", "battle", "item_battle"].includes(game_type)
+    ? game_type
+    : "single";
 
   // 점수 검증
   if (score === undefined || score === null) {
@@ -90,11 +93,12 @@ router.get("/battle-ranking", (req, res) => {
   const sql = `
     SELECT
         u.user_id,
-        b.wins,
-        b.played
+        SUM(b.wins) AS wins,
+        SUM(b.played) AS played
     FROM battle_scores b
     JOIN users u ON b.player_id = u.id
-    ORDER BY b.wins DESC
+    GROUP BY b.player_id, u.user_id
+    ORDER BY wins DESC
     LIMIT 10
   `;
 
@@ -111,11 +115,12 @@ router.get("/item-ranking", (req, res) => {
   const sql = `
     SELECT
         u.user_id,
-        b.wins,
-        b.played
+        SUM(b.wins) AS wins,
+        SUM(b.played) AS played
     FROM item_scores b
     JOIN users u ON b.player_id = u.id
-    ORDER BY b.wins DESC
+    GROUP BY b.player_id, u.user_id
+    ORDER BY wins DESC
     LIMIT 10
   `;
 

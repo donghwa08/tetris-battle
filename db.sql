@@ -12,11 +12,34 @@ CREATE TABLE users (
 CREATE TABLE scores (
   id INT AUTO_INCREMENT PRIMARY KEY,
   player_id INT NOT NULL,
+  game_type ENUM('single', 'battle', 'item_battle') NOT NULL DEFAULT 'single',
   score INT NOT NULL,
   lines_cleared INT DEFAULT 0,
   level INT DEFAULT 1,
   play_time INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (player_id) REFERENCES users(id),
+  INDEX idx_game_type (game_type),
+  INDEX idx_game_type_score (game_type, score DESC)
+);
+
+CREATE TABLE battle_scores (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  player_id INT NOT NULL,
+  wins INT DEFAULT 0,
+  played INT DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_player (player_id),
+  FOREIGN KEY (player_id) REFERENCES users(id)
+);
+
+CREATE TABLE item_scores (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  player_id INT NOT NULL,
+  wins INT DEFAULT 0,
+  played INT DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_player (player_id),
   FOREIGN KEY (player_id) REFERENCES users(id)
 );
 
