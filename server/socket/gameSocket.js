@@ -123,16 +123,14 @@ module.exports = (io) => {
       const room = rooms[code];
       if (!room) return;
 
-      const oppPlayer = room.players.find((p) => p.socketId !== socket.id);
-      if (!oppPlayer) return;
+      const myBoard = board || room.lastBoard?.[socket.id];
+      const opp = room.players.find((p) => p.socketId !== socket.id);
+      const oppBoard = room.lastBoard?.[opp?.socketId];
 
-      const oppSocket = io.sockets.sockets.get(oppPlayer.socketId);
-      if (!oppSocket) return;
+      if (!oppBoard || !myBoard) return;
 
-      const oppBoard = room.lastBoard?.[oppPlayer.socketId];
-
-      oppSocket.emit("receiveSwap", { board });
       socket.emit("swapConfirm", { board: oppBoard });
+      socket.to(code).emit("receiveSwap", { board: myBoard });
     });
 
     socket.on("playerReady", (data) => {
