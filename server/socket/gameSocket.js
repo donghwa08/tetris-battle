@@ -120,28 +120,13 @@ module.exports = (io) => {
 
     socket.on("requestSwap", ({ roomId, roomCode, board }) => {
       const code = roomId || roomCode;
-      console.log("requestSwap 받음:", code, "보드:", board ? "있음" : "없음"); // ← 추가
       const room = rooms[code];
-      if (!room) {
-        console.log("방 없음");
-        return;
-      }
+      if (!room) return;
 
       const myBoard = board || room.lastBoard?.[socket.id];
       const opp = room.players.find((p) => p.socketId !== socket.id);
       const oppBoard = room.lastBoard?.[opp?.socketId];
-
-      console.log(
-        "myBoard:",
-        myBoard ? "있음" : "없음",
-        "oppBoard:",
-        oppBoard ? "있음" : "없음",
-      ); // ← 추가
-
-      if (!oppBoard || !myBoard) {
-        console.log("보드 없어서 return");
-        return;
-      }
+      if (!myBoard || !oppBoard) return;
 
       socket.emit("swapConfirm", { board: oppBoard });
       socket.to(code).emit("receiveSwap", { board: myBoard });

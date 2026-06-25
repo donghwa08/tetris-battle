@@ -25,11 +25,12 @@ const db = mysql.createPool({
   queueLimit: 0,
 });
 
-db.connect((err) => {
+db.getConnection((err, connection) => {
   if (err) {
     console.error("DB 연결 실패:", err);
     return;
   }
+  connection.release();
   console.log("DB 연결 성공!");
 });
 
