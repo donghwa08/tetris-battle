@@ -111,7 +111,28 @@ module.exports = (io) => {
     });
     socket.on("boardUpdate", (data) => {
       const code = data.roomCode || data.roomId;
+      if (rooms[code]) {
+        if (!rooms[code].lastBoard) rooms[code].lastBoard = {};
+        rooms[code].lastBoard[socket.id] = data.board;
+      }
       socket.to(code).emit("opponentBoard", data);
+    });
+
+    socket.on("requestSwap", ({ roomId, roomCode, board }) => {
+      const code = roomId || roomCode;
+      const room = rooms[code];
+      if (!room) return;
+
+      const oppPlayer = room.players.find((p) => p.socketId !== socket.id);
+      if (!oppPlayer) return;
+
+      const oppSocket = io.sockets.sockets.get(oppPlayer.socketId);
+      if (!oppSocket) return;
+
+      const oppBoard = room.lastBoard?.[oppPlayer.socketId];
+
+      oppSocket.emit("receiveSwap", { board });
+      socket.emit("swapConfirm", { board: oppBoard });
     });
 
     socket.on("playerReady", (data) => {
