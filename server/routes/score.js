@@ -14,7 +14,8 @@ const db = mysql.createPool({
 });
 
 router.post("/score", (req, res) => {
-  const { player_id, score, lines_cleared, level, play_time } = req.body;
+  const { player_id, score, lines_cleared, level, play_time, game_type } = req.body;
+  const mode = ['single', 'battle', 'item_battle'].includes(game_type) ? game_type : 'single';
 
   // 점수 검증
   if (score === undefined || score === null) {
@@ -35,10 +36,10 @@ router.post("/score", (req, res) => {
     return res.status(400).json({ message: "비정상적인 레벨입니다." });
   }
 
-  const sql = `INSERT INTO scores (player_id, score, lines_cleared, level, play_time) VALUES (?,?,?,?,?)`;
+  const sql = `INSERT INTO scores (player_id, game_type, score, lines_cleared, level, play_time) VALUES (?,?,?,?,?,?)`;
   db.query(
     sql,
-    [player_id, score, lines_cleared, level, play_time],
+    [player_id, mode, score, lines_cleared, level, play_time],
     (err, result) => {
       if (err) {
         return res.status(500).json({ message: "DB 저장 실패", error: err });
@@ -70,7 +71,7 @@ router.get("/ranking", (req, res) => {
         DATE(MAX(s.created_at)) AS created_at
     FROM scores s
     JOIN users u ON s.player_id = u.id
-    WHERE 1=1 ${dateFilter}
+    WHERE s.game_type = 'single' ${dateFilter}
     GROUP BY u.user_id
     ORDER BY score DESC
     LIMIT 10

@@ -1,6 +1,7 @@
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
+const path = require("path");
 const { Server } = require("socket.io");
 const mysql = require("mysql2");
 require("dotenv").config();
@@ -41,6 +42,7 @@ app.use(
   }),
 );
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "../frontend")));
 
 //라우터 연결
 const scoreRouter = require("./routes/score");
