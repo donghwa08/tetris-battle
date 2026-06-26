@@ -22,7 +22,7 @@ function saveBattleScore(user_id, wins, played, table) {
 
 module.exports = (io) => {
   const rooms = {};
-  const quickQueue = [];
+  const quickQueues = {}; // 모드별 큐: { battle: [], item: [] }
   const rematchReady = {};
 
   io.on("connection", (socket) => {
@@ -30,11 +30,13 @@ module.exports = (io) => {
 
     socket.on("quickMatch", (data) => {
       if (data.user_id) socket.user_id = data.user_id;
-      quickQueue.push({ socket, user_id: data.user_id });
+      const mode = data.mode || "battle";
+      if (!quickQueues[mode]) quickQueues[mode] = [];
+      quickQueues[mode].push({ socket, user_id: data.user_id, mode });
 
-      if (quickQueue.length >= 2) {
-        const player1 = quickQueue.shift();
-        const player2 = quickQueue.shift();
+      if (quickQueues[mode].length >= 2) {
+        const player1 = quickQueues[mode].shift();
+        const player2 = quickQueues[mode].shift();
 
         const roomCode = Math.random()
           .toString(36)
@@ -63,8 +65,15 @@ module.exports = (io) => {
     });
 
     socket.on("cancelQuick", () => {
-      const idx = quickQueue.findIndex((p) => p.socket.id === socket.id);
-      if (idx !== -1) quickQueue.splice(idx, 1);
+      for (const mode in quickQueues) {
+        const idx = quickQueues[mode].findIndex(
+          (p) => p.socket.id === socket.id,
+        );
+        if (idx !== -1) {
+          quickQueues[mode].splice(idx, 1);
+          break;
+        }
+      }
     });
 
     socket.on("requestRematch", (data) => {
@@ -181,10 +190,14 @@ module.exports = (io) => {
         const loser = room.players.find((p) => p.socketId === socket.id);
         const winner = room.players.find((p) => p.socketId !== socket.id);
         const loserUserId = loser?.user_id || socket.user_id;
-        const winnerSocket = winner ? io.sockets.sockets.get(winner.socketId) : null;
+        const winnerSocket = winner
+          ? io.sockets.sockets.get(winner.socketId)
+          : null;
         const winnerUserId = winner?.user_id || winnerSocket?.user_id;
 
-        console.log(`[gameOver] table:${scoreTable} loser:${loserUserId} winner:${winnerUserId}`);
+        console.log(
+          `[gameOver] table:${scoreTable} loser:${loserUserId} winner:${winnerUserId}`,
+        );
         if (winner && loser) {
           if (loserUserId) saveBattleScore(loserUserId, 0, 1, scoreTable);
           if (winnerUserId) saveBattleScore(winnerUserId, 1, 1, scoreTable);
@@ -213,8 +226,15 @@ module.exports = (io) => {
         }
       }
 
-      const idx = quickQueue.findIndex((p) => p.socket.id === socket.id);
-      if (idx !== -1) quickQueue.splice(idx, 1);
+      for (const mode in quickQueues) {
+        const idx = quickQueues[mode].findIndex(
+          (p) => p.socket.id === socket.id,
+        );
+        if (idx !== -1) {
+          quickQueues[mode].splice(idx, 1);
+          break;
+        }
+      }
 
       for (const roomCode in rooms) {
         const room = rooms[roomCode];
