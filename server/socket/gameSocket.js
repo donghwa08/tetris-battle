@@ -29,6 +29,7 @@ module.exports = (io) => {
     console.log("유저 접속:", socket.id);
 
     socket.on("quickMatch", (data) => {
+      if (data.user_id) socket.user_id = data.user_id;
       quickQueue.push({ socket, user_id: data.user_id });
 
       if (quickQueue.length >= 2) {
@@ -82,6 +83,7 @@ module.exports = (io) => {
     });
 
     socket.on("createRoom", (data) => {
+      if (data?.user_id) socket.user_id = data.user_id;
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       rooms[roomCode] = {
         players: [{ socketId: socket.id, user_id: data?.user_id }],
@@ -105,6 +107,7 @@ module.exports = (io) => {
         return socket.emit("error", { message: "방이 꽉 찼습니다." });
       }
 
+      if (data.user_id) socket.user_id = data.user_id;
       room.players.push({ socketId: socket.id, user_id: data.user_id });
       socket.join(roomCode);
       socket.emit("joinedRoom", {
@@ -177,10 +180,13 @@ module.exports = (io) => {
 
         const loser = room.players.find((p) => p.socketId === socket.id);
         const winner = room.players.find((p) => p.socketId !== socket.id);
+        const loserUserId = loser?.user_id || socket.user_id;
+        const winnerSocket = winner ? io.sockets.sockets.get(winner.socketId) : null;
+        const winnerUserId = winner?.user_id || winnerSocket?.user_id;
 
         if (winner && loser) {
-          if (loser.user_id) saveBattleScore(loser.user_id, 0, 1, scoreTable);
-          if (winner.user_id) saveBattleScore(winner.user_id, 1, 1, scoreTable);
+          if (loserUserId) saveBattleScore(loserUserId, 0, 1, scoreTable);
+          if (winnerUserId) saveBattleScore(winnerUserId, 1, 1, scoreTable);
 
           io.to(winner.socketId).emit("battleResult", {
             result: "win",
