@@ -33,6 +33,7 @@ module.exports = (io) => {
       const mode = data.mode || "battle";
       if (!quickQueues[mode]) quickQueues[mode] = [];
       quickQueues[mode].push({ socket, user_id: data.user_id, mode });
+      console.log(`[quickMatch] user:${data.user_id} mode:${mode} queueSize:${quickQueues[mode].length}`);
 
       if (quickQueues[mode].length >= 2) {
         const player1 = quickQueues[mode].shift();
