@@ -184,6 +184,7 @@ module.exports = (io) => {
         const winnerSocket = winner ? io.sockets.sockets.get(winner.socketId) : null;
         const winnerUserId = winner?.user_id || winnerSocket?.user_id;
 
+        console.log(`[gameOver] table:${scoreTable} loser:${loserUserId} winner:${winnerUserId}`);
         if (winner && loser) {
           if (loserUserId) saveBattleScore(loserUserId, 0, 1, scoreTable);
           if (winnerUserId) saveBattleScore(winnerUserId, 1, 1, scoreTable);
