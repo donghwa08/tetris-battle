@@ -1,3 +1,25 @@
+const mysql = require("mysql2");
+require("dotenv").config();
+
+const db = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 5,
+  queueLimit: 0,
+});
+
+function saveBattleScore(user_id, wins, played, table) {
+  const sql = `
+    INSERT INTO ${table} (player_id, wins, played)
+    SELECT id, ?, ? FROM users WHERE user_id = ?
+    ON DUPLICATE KEY UPDATE wins = wins + ?, played = played + ?
+  `;
+  db.query(sql, [wins, played, user_id, wins, played], () => {});
+}
+
 module.exports = (io) => {
   const rooms = {};
   const quickQueue = [];
@@ -145,17 +167,21 @@ module.exports = (io) => {
 
     // 게임 오버 - 진 사람의 user_id를 받아서 승패 판정 후 양쪽에 결과 통보
     // 결과 통보를 받은 클라이언트가 /api/battle-score 로 POST 호출해서 DB에 저장함
-    socket.on("gameOver", ({ roomCode, roomId, user_id }) => {
+    socket.on("gameOver", ({ roomCode, roomId, table }) => {
       const code = roomCode || roomId;
       const room = rooms[code];
+      const scoreTable = table || "battle_scores";
 
       if (room && room.status !== "finished") {
         room.status = "finished";
 
-        const loser = room.players.find((p) => p.user_id === user_id);
-        const winner = room.players.find((p) => p.user_id !== user_id);
+        const loser = room.players.find((p) => p.socketId === socket.id);
+        const winner = room.players.find((p) => p.socketId !== socket.id);
 
         if (winner && loser) {
+          if (loser.user_id) saveBattleScore(loser.user_id, 0, 1, scoreTable);
+          if (winner.user_id) saveBattleScore(winner.user_id, 1, 1, scoreTable);
+
           io.to(winner.socketId).emit("battleResult", {
             result: "win",
             opponent: loser.user_id,
